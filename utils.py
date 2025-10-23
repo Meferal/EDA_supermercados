@@ -2,94 +2,7 @@ import re
 import pandas as pd
 
 
-def parse_product_format(text):
-    """
-    Extrae y normaliza valores numéricos de formatos de productos.
-    
-    Reglas:
-    - Si hay valores entre paréntesis, usar ese valor
-    - Si hay dos números separados por 'x', multiplicarlos
-    - Si el resultado es > 100, dividir entre 1000
-    
-    Args:
-        text (str): Texto del formato del producto
-        
-    Returns:
-        float: Valor numérico normalizado
-    """
-    if not isinstance(text, str):
-        return None
-    
-    # Buscar números entre paréntesis
-    parentesis = re.search(r'\(([0-9]+(?:[.,][0-9]+)?)\s*[a-zA-Z]*\)', text)
-    if parentesis:
-        valor = float(parentesis.group(1).replace(',', '.'))
-        return valor / 1000 if valor > 100 else valor
-    
-    # Buscar patrón de multiplicación (ej: "2 x 2" o "12 latas x 330")
-    multiplicacion = re.search(r'(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)', text, re.IGNORECASE)
-    if multiplicacion:
-        num1 = float(multiplicacion.group(1).replace(',', '.'))
-        num2 = float(multiplicacion.group(2).replace(',', '.'))
-        valor = num1 * num2
-        return valor / 1000 if valor > 100 else valor
-    
-    # Buscar cualquier número (con opción de decimales)
-    numeros = re.findall(r'\d+(?:[.,]\d+)?', text)
-    if numeros:
-        valor = float(numeros[0].replace(',', '.'))
-        return valor / 1000 if valor > 100 else valor
-    
-    return None
-
-# Aplicar a un DataFrame
-# df['valor_normalizado'] = df['formato'].apply(parse_product_format)
-
-
-# Método 1: Extraer la última palabra/palabras como marca
-def extraer_marca_simple(nombre):
-    """Extrae la última palabra como marca"""
-    if pd.isna(nombre):
-        return None
-    return nombre.split()[-1]
-
-
-# Método 2: Extraer después de palabras clave comunes
-def extraer_marca_avanzada(nombre):
-    """
-    Extrae la marca considerando patrones comunes:
-    - Después de preposiciones (de, con, sabor, etc.)
-    - Última palabra si es capitalizada
-    """
-    if pd.isna(nombre):
-        return None
-    
-    # Dividir en palabras
-    palabras = nombre.split()
-    
-    # Si hay pocas palabras, tomar la última
-    if len(palabras) <= 2:
-        return palabras[-1]
-    
-    # Buscar después de palabras clave comunes
-    palabras_clave = ['sabor', 'de', 'con', 'para', 'sin', 'en', 'a']
-    
-    # Recorrer desde el final
-    for i in range(len(palabras)-1, -1, -1):
-        palabra = palabras[i]
-        # Si la palabra anterior es una palabra clave y esta empieza con mayúscula
-        if i > 0 and palabras[i-1].lower() in palabras_clave:
-            # La marca probablemente es todo lo que viene después
-            return ' '.join(palabras[i:])
-        # Si llegamos a una palabra que probablemente sea marca (mayúscula o final)
-        if i == len(palabras)-1 or palabra[0].isupper():
-            continue
-    
-    # Por defecto, tomar la última palabra
-    return palabras[-1]
-
-
-# Método 3: Usando un diccionario de marcas conocidas (RECOMENDADO)
+# Usando un diccionario de marcas conocidas
 def extraer_marca_con_diccionario(nombre, marcas_conocidas):
     """
     Busca marcas conocidas en el nombre del producto
@@ -105,11 +18,11 @@ def extraer_marca_con_diccionario(nombre, marcas_conocidas):
         if marca.lower() in nombre_lower:
             return marca
     
-    # Si no encuentra ninguna, usar método simple
+    # Si no encuentra ninguna
     return "Desconocida"
 
 
-# Lista de marcas que aparecen en tus datos
+# Lista de marcas
 marcas_conocidas = [
     # Marcas blancas y distribución
     'Hacendado', 'Deliplus', 'Bosque Verde',
@@ -236,7 +149,7 @@ marcas_conocidas = [
     'S3', 'Rose Nude', 'Elección', '9.60', 'Como Tú', 'Chanson d\'Eau',
     'Ikiru', 'Vuela', 'Soplo', 'Blue Shine', 'My Soul', 'Verissime',
     'Cosmic Shine', 'Éclant', 'Monogotas', 'Boem', 'Women\'Secret',
-    'Sun Med', 'Colagen', 'Vitaldin', 'Moldex', 'On',
+    'Sun Med', 'Colagen', 'Vitaldin', 'Moldex',
     
     # Limpieza del hogar
     'Ariel', 'Micolor', 'Beltrán', 'Estrella', 'Orache', 'Krisul',
@@ -262,7 +175,7 @@ marcas_conocidas = [
 # )
 
 
-def extract_product_format(product_name):
+def extract_product_format(product_name):       # Carrefour
     """
     Extrae el formato de un producto de supermercado.
     
@@ -303,16 +216,16 @@ def extract_product_format(product_name):
         r'(pack\s+de\s+\d+\s+\w+\s+de\s+\d+[\.,]?\d*\s*(?:l|cl|ml|g|kg|ud|uds))',
         
         # Múltiples simples: "6x80 uds", "3x72"
-        r'(\d+\s*x\s*\d+(?:\s*(?:ud|uds|unidades?))?)',
+        r'(\d*\s*x\s*\d+(?:\s*(?:ud|uds|unidades|us|d|u|und?))?)',
         
         # Con tipo de envase: "lata 33 cl", "botella 1 l", "brik 1 l"
         r'((?:lata|botella|brik|tarrito|bolsita|frasco|sobre|paquete)\s+(?:de\s+)?\d+[\.,]?\d*\s*(?:l|cl|ml|g|kg))',
         
         # Volumen o peso simple al final: "1 l", "500 ml", "100 g"
-        r'(\d+[\.,]?\d*\s*(?:l|cl|ml|g|kg)(?:\s|$))',
+        r'(\d+[\.,]?\d*\s*(?:l|cl|ml|g|gr|kg)(?:\s|$))',
         
         # Unidades simples: "80 ud", "64 uds"
-        r'(\d+\s*(?:ud|uds|unidades?)(?:\s|$))',
+        r'(\d+\s*(?:u|ud|und|uds|unidades|rollo|rollos|pieza|piezas|pastilla|capsulas|pastillas|sobres|comprimidos|ampollas|lavados|hojas?)(?:\s|$))',
     ]
     
     # Buscar el primer patrón que coincida
@@ -406,30 +319,8 @@ def calculate_total_quantity(format_str):
     Retorna:
     --------
     float : La cantidad total en la unidad estándar, o None si no se puede calcular
-    
-    Ejemplos:
-    ---------
-    >>> calculate_total_quantity('80 ud')
-    80.0
-    
-    >>> calculate_total_quantity('6x80 uds')
-    480.0
-    
-    >>> calculate_total_quantity('pack de 3 paquetes de 80 ud')
-    240.0
-    
-    >>> calculate_total_quantity('pack de 3 unidades de 200 ml')
-    0.6
-    
-    >>> calculate_total_quantity('pack de 2 unidades de 235 g')
-    0.47
-    
-    >>> calculate_total_quantity('1500 ml')
-    1.5
-    
-    >>> calculate_total_quantity('36 cl')
-    0.36
     """
+
     if pd.isna(format_str) or format_str == '':
         return None
     
@@ -446,20 +337,52 @@ def calculate_total_quantity(format_str):
         total = multiplier * quantity
         return convert_to_standard_unit(total, unit)
     
-    # Patrón 2: Múltiples tipo "6x80 uds" o "100 x 6"
+    # Patrón 2: "pack de X botellas/briks" sin cantidad específica
+    pattern_pack_simple_count = r'pack\s+(?:de\s+)?(\d+)\s+(botellas?|briks?|latas?|paquetes?|rollos?)'
+    match = re.search(pattern_pack_simple_count, format_str)
+    if match:
+        quantity = float(match.group(1))
+        return round(quantity, 0)
+    
+    # Patrón 3: "pack X botellas/briks" (sin "de")
+    pattern_pack_no_de = r'pack\s+(\d+)\s+(botellas?|briks?|latas?)'
+    match = re.search(pattern_pack_no_de, format_str)
+    if match:
+        quantity = float(match.group(1))
+        return round(quantity, 0)
+    
+    # Patrón 4: Múltiples tipo "x72", "x 500", "x50"
+    pattern_x = r'x\s*(\d+)'
+    match = re.search(pattern_x, format_str)
+    if match:
+        quantity = float(match.group(1))
+        return round(quantity, 0)
+    
+    # Patrón 5: Múltiples tipo "6x80 uds" o "100 x 6"
     pattern_multiple = r'(\d+)\s*x\s*(\d+)\s*(?:(ml|cl|l|g|kg|ud|uds|unidades?))?'
     match = re.search(pattern_multiple, format_str)
     if match:
         num1 = float(match.group(1))
         num2 = float(match.group(2))
-        unit = match.group(3) if match.group(3) else 'l'  # Asume litros si no hay unidad
+        unit = match.group(3) if match.group(3) else 'ud'  # Asume unidades si no hay unidad
         
         total = num1 * num2
         return convert_to_standard_unit(total, unit)
     
-    # Patrón 3: Pack simple tipo "pack de 12 latas de 33 cl"
-    pattern_pack_simple = r'pack\s+de\s+(\d+)\s+(?:latas?|botellas?|briks?)\s+de\s+(\d+[\.,]?\d*)\s*(ml|cl|l|g|kg)'
-    match = re.search(pattern_pack_simple, format_str)
+    # Patrón 6: Cantidad con descriptores tipo "12 rollos", "30 pastillas", "4 piezas", "24 comprimidos"
+    pattern_quantity_descriptor = r'(\d+)\s*(rollos?|pastillas?|piezas?|sobres?|comprimidos?|hojas?|ampollas?|capsula?|u|und(?:\b|$))'
+    match = re.search(pattern_quantity_descriptor, format_str)
+    if match:
+        quantity = float(match.group(1))
+        return round(quantity, 0)
+    
+    # Patrón 7: "1 paquete" - caso especial
+    if re.search(r'\b1\s*paquetes?\b', format_str):
+        return 1.0
+    
+    # Patrón 8: Pack simple tipo "pack de 12 latas de 33 cl"
+    pattern_pack_with_volume = r'pack\s+de\s+(\d+)\s+(?:latas?|botellas?|briks?)\s+de\s+(\d+[\.,]?\d*)\s*(ml|cl|l|g|kg)'
+    match = re.search(pattern_pack_with_volume, format_str)
     if match:
         multiplier = float(match.group(1))
         quantity = float(match.group(2).replace(',', '.'))
@@ -468,7 +391,7 @@ def calculate_total_quantity(format_str):
         total = multiplier * quantity
         return convert_to_standard_unit(total, unit)
     
-    # Patrón 4: Con envase tipo "lata 33 cl", "botella 1 l"
+    # Patrón 9: Con envase tipo "lata 33 cl", "botella 1 l"
     pattern_container = r'(?:lata|botella|brik|tarrito|bolsita|frasco|sobre|paquete)\s+(?:de\s+)?(\d+[\.,]?\d*)\s*(ml|cl|l|g|kg)'
     match = re.search(pattern_container, format_str)
     if match:
@@ -476,7 +399,7 @@ def calculate_total_quantity(format_str):
         unit = match.group(2)
         return convert_to_standard_unit(quantity, unit)
     
-    # Patrón 5: Cantidad simple tipo "1500 ml", "36 cl", "80 ud"
+    # Patrón 10: Cantidad simple tipo "1500 ml", "36 cl", "80 ud"
     pattern_simple = r'(\d+[\.,]?\d*)\s*(ml|cl|l|g|kg|ud|uds|unidades?)'
     match = re.search(pattern_simple, format_str)
     if match:
@@ -506,17 +429,17 @@ def convert_to_standard_unit(quantity, unit):
     
     # Conversiones de volumen a Litros
     if unit == 'ml':
-        return round(quantity / 1000, 3)
+        return round(quantity / 1000, 6)
     elif unit == 'cl':
-        return round(quantity / 100, 3)
+        return round(quantity / 100, 6)
     elif unit == 'l':
-        return round(quantity, 3)
+        return round(quantity, 6)
     
     # Conversiones de peso a Kilogramos
     elif unit == 'g':
-        return round(quantity / 1000, 3)
+        return round(quantity / 1000, 6)
     elif unit == 'kg':
-        return round(quantity, 3)
+        return round(quantity, 6)
     
     # Unidades se mantienen igual
     elif unit in ['ud', 'uds', 'unidades', 'unidad']:
@@ -556,80 +479,3 @@ def get_unit_type(format_str):
         return 'ud'
     
     return None
-
-
-# Ejemplo de uso completo
-if __name__ == "__main__":
-    # Datos de ejemplo
-    test_cases = [
-        ('80 ud', 80.0, 'ud'),
-        ('6x80 uds', 480.0, 'ud'),
-        ('pack de 3 paquetes de 80 ud', 240.0, 'ud'),
-        ('pack de 3 unidades de 200 ml', 0.6, 'L'),
-        ('pack de 2 unidades de 235 g', 0.47, 'Kg'),
-        ('pack de 2 unidades de 50 ml', 0.1, 'L'),
-        ('1500 ml', 1.5, 'L'),
-        ('100 x 6', 600.0, 'L'),  # Nota: este asume L por defecto
-        ('36 cl', 0.36, 'L'),
-        ('lata 33 cl', 0.33, 'L'),
-        ('botella 1 l', 1.0, 'L'),
-        ('brik 1 l', 1.0, 'L'),
-        ('pack de 12 latas de 33 cl', 3.96, 'L'),
-        ('800 g', 0.8, 'Kg'),
-        ('1 kg', 1.0, 'Kg'),
-    ]
-    
-    print("PRUEBAS DE LA FUNCIÓN:")
-    print("="*80)
-    print(f"{'Formato de entrada':<40} {'Esperado':<12} {'Calculado':<12} {'Unidad':<8} {'OK'}")
-    print("="*80)
-    
-    for format_str, expected, expected_unit in test_cases:
-        calculated = calculate_total_quantity(format_str)
-        unit = get_unit_type(format_str)
-        ok = "✓" if abs(calculated - expected) < 0.01 and unit == expected_unit else "✗"
-        print(f"{format_str:<40} {expected:<12} {calculated:<12} {unit:<8} {ok}")
-    
-    print("\n" + "="*80)
-    print("EJEMPLO CON DATAFRAME:")
-    print("="*80)
-    
-    # Crear DataFrame de ejemplo
-    df = pd.DataFrame({
-        'producto': [
-            'toallitas bebe fres aloe vera carrefour 80 ud',
-            'toallitas bebe fresh aloe vera carrefour baby 6x80 uds',
-            'preparado lacteo infantil de crecimiento brik 1 l',
-            'cerveza budweiser lager lata 33 cl',
-            'cerveza san miguel especial pack de 12 latas de 33 cl',
-            'preparado lacteo infantil pack de 3 unidades de 200 ml',
-            'tarrito de verduritas con pollo 235 g',
-            'agua mineral bezoya 1500 ml'
-        ]
-    })
-    
-    # Extraer formato (usando la función del script anterior)
-    def extract_product_format(product_name):
-        if pd.isna(product_name):
-            return None
-        product_name = str(product_name).lower()
-        patterns = [
-            r'((?:mini\s+)?pack\s+(?:de\s+)?\d+\s+(?:latas?|botellas?|briks?|unidades?|uds?)(?:\s+de\s+\d+[\.,]?\d*\s*(?:l|cl|ml|g|kg))?)',
-            r'(pack\s+de\s+\d+\s+unidades?\s+de\s+\d+[\.,]?\d*\s*(?:l|cl|ml|g|kg))',
-            r'(pack\s+de\s+\d+\s+\w+\s+de\s+\d+[\.,]?\d*\s*(?:l|cl|ml|g|kg|ud|uds))',
-            r'(\d+\s*x\s*\d+(?:\s*(?:ud|uds|unidades?))?)',
-            r'((?:lata|botella|brik|tarrito|bolsita|frasco|sobre|paquete)\s+(?:de\s+)?\d+[\.,]?\d*\s*(?:l|cl|ml|g|kg))',
-            r'(\d+[\.,]?\d*\s*(?:l|cl|ml|g|kg)(?:\s|$))',
-            r'(\d+\s*(?:ud|uds|unidades?)(?:\s|$))',
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, product_name)
-            if match:
-                return match.group(1).strip()
-        return None
-    
-    df['formato'] = df['producto'].apply(extract_product_format)
-    df['cantidad_total'] = df['formato'].apply(calculate_total_quantity)
-    df['unidad'] = df['formato'].apply(get_unit_type)
-    
-    print(df[['producto', 'formato', 'cantidad_total', 'unidad']].to_string())
